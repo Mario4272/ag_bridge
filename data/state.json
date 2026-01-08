@@ -10,7 +10,7 @@
       "to": "agent",
       "channel": "work",
       "text": "Test",
-      "status": "new"
+      "status": "read"
     },
     {
       "id": "msg_mk5w3nockdear",
@@ -19,17 +19,99 @@
       "to": "agent",
       "channel": "work",
       "text": "Test again",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5xzo7trihwr",
+      "createdAt": "2026-01-08T21:11:19.385Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Ping from phone",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5y33dc4jewh",
+      "createdAt": "2026-01-08T21:13:58.992Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Hello Ag this is Mario.  Tell me you're ok",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5ykszex8m27",
+      "createdAt": "2026-01-08T21:27:45.338Z",
+      "from": "agent",
+      "to": "user",
+      "channel": "general",
+      "text": "I am OK, Mario! MCP implementation is verified.",
+      "status": "new"
+    },
+    {
+      "id": "msg_mk5yrrjwcltq0",
+      "createdAt": "2026-01-08T21:33:10.076Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Hey AG.  New test run.  Let me know you got this",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5ystgfycub6",
+      "createdAt": "2026-01-08T21:33:59.199Z",
+      "from": "user",
+      "to": "user",
+      "channel": "work",
+      "text": "I see you! Polling is working perfectly. ⚡",
+      "status": "new"
+    },
+    {
+      "id": "msg_mk5z041n2qym0",
+      "createdAt": "2026-01-08T21:39:39.515Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Hey AG.  Reply with Hey Mario, I am here.",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5ze6yjue9er",
+      "createdAt": "2026-01-08T21:50:36.475Z",
+      "from": "agent",
+      "to": "user",
+      "channel": "work",
+      "text": "Hey Mario, I am here.",
+      "status": "new"
+    },
+    {
+      "id": "msg_mk5zhn0hcness",
+      "createdAt": "2026-01-08T21:53:17.249Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Ok last test.  I don't know for sure that this page is updating automatically.  Meaning without a refresh.  Tell me check again Mario",
+      "status": "read"
+    },
+    {
+      "id": "msg_mk5zjc4nxkoz2",
+      "createdAt": "2026-01-08T21:54:36.455Z",
+      "from": "agent",
+      "to": "user",
+      "channel": "work",
+      "text": "Check again Mario. (Automatic update test)",
       "status": "new"
     }
   ],
   "agent": {
-    "state": "idle",
-    "lastSeen": null,
-    "task": "",
-    "note": ""
+    "state": "working",
+    "lastSeen": "2026-01-08T21:12:48.169Z",
+    "task": "Verifying MCP Integration",
+    "note": "Manual Check"
   },
   "checkpoints": [],
   "tokens": [
-    "8ce5365869bb490e0a14ea7e1f7cf13c"
+    "8ce5365869bb490e0a14ea7e1f7cf13c",
+    "834ee9acea54282f02947bd645ac832f"
   ]
 }

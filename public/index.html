@@ -451,6 +451,13 @@
       fetchMessages();
       fetchAgentStatus();
       connectWS();
+
+      // Polling Fallback (every 5s)
+      setInterval(() => {
+        fetchMessages();
+        fetchAgentStatus();
+        fetchStatus(); // Also good to keep pending count fresh
+      }, 5000);
     }
 
     function logout() {

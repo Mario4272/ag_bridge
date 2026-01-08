@@ -172,6 +172,12 @@ app.use(express.json());
 app.use(express.static('public'));
 
 const requireAuth = (req, res, next) => {
+    // Allow localhost (MCP server) to bypass auth
+    const ip = req.ip || req.connection.remoteAddress;
+    if (ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1') {
+        return next();
+    }
+
     const token = req.headers['x-ag-token'];
     if (!token || !TOKENS.has(token)) {
         return res.status(401).json({ error: 'Unauthorized' });
