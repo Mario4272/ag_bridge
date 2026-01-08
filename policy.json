@@ -1,0 +1,18 @@
+{
+    "allow": [
+        "^echo",
+        "^ls",
+        "^dir",
+        "^pnpm test",
+        "^npm test",
+        "^git status"
+    ],
+    "deny": [
+        "rm ",
+        "del ",
+        "format ",
+        "mv ",
+        "chmod ",
+        "chown "
+    ]
+}

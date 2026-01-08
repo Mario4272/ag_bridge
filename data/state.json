@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "strictMode": true,
+  "approvals": [],
+  "messages": [
+    {
+      "id": "msg_mk5w2bc8rhaxa",
+      "createdAt": "2026-01-08T20:17:23.432Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Test",
+      "status": "new"
+    },
+    {
+      "id": "msg_mk5w3nockdear",
+      "createdAt": "2026-01-08T20:18:26.076Z",
+      "from": "user",
+      "to": "agent",
+      "channel": "work",
+      "text": "Test again",
+      "status": "new"
+    }
+  ],
+  "agent": {
+    "state": "idle",
+    "lastSeen": null,
+    "task": "",
+    "note": ""
+  },
+  "checkpoints": [],
+  "tokens": [
+    "8ce5365869bb490e0a14ea7e1f7cf13c"
+  ]
+}

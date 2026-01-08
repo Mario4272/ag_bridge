@@ -1,0 +1,20 @@
+{
+  "name": "ag-bridge",
+  "version": "1.0.0",
+  "description": "LAN-only companion app for agent supervision",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.19.0",
+    "zod": "^3.22.4",
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  }
+}

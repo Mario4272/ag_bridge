@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="manifest.json">
+  <title>AG Bridge</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card-bg: #1a1d23;
+      --text: #e0e0e0;
+      --text-dim: #9ca3af;
+      --primary: #3b82f6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --border: #374151;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      padding-bottom: 80px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* Utility */
+    .hidden {
+      display: none !important;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-2 {
+      gap: 8px;
+    }
+
+    .mb-4 {
+      margin-bottom: 16px;
+    }
+
+    .mt-4 {
+      margin-top: 16px;
+    }
+
+    /* Inputs & Buttons */
+    input {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      width: 100%;
+      box-sizing: border-box;
+      outline: none;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      width: 100%;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:active {
+      opacity: 0.8;
+    }
+
+    button.secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.success {
+      background: var(--success);
+    }
+
+    /* Views */
+    #pairing-view {
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .approval-item {
+      border-left: 4px solid var(--primary);
+    }
+
+    .approval-item.status-approved {
+      border-left-color: var(--success);
+      opacity: 0.6;
+    }
+
+    .approval-item.status-denied {
+      border-left-color: var(--danger);
+      opacity: 0.6;
+    }
+
+    .tag {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #333;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .tag.pending {
+      background: #d97706;
+      color: white;
+    }
+
+    .tag.approved {
+      background: var(--success);
+      color: white;
+    }
+
+    .tag.denied {
+      background: var(--danger);
+      color: white;
+    }
+
+    pre {
+      background: black;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+      color: #a5f3fc;
+      margin: 10px 0;
+    }
+
+    /* Logs */
+    #event-log {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      max-height: 150px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+    }
+
+    .log-entry span {
+      color: var(--primary);
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #444;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .chat-container {
+      max-height: 400px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .msg {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 85%;
+      font-size: 14px;
+    }
+
+    .msg.user {
+      background: var(--primary);
+      color: #000;
+      margin-left: auto;
+      border-bottom-right-radius: 0;
+    }
+
+    .msg.agent {
+      background: #333;
+      color: #ddd;
+      margin-right: auto;
+      border-bottom-left-radius: 0;
+    }
+
+    .msg-meta {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .chat-input-area {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      color: white;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 5px;
+      margin-top: 10px;
+      overflow-x: auto;
+    }
+
+    .quick-btn {
+      font-size: 12px;
+      padding: 6px 10px;
+      white-space: nowrap;
+      background: #333;
+      border: 1px solid #555;
+      color: #aaa;
+    }
+
+    .agent-status {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: #333;
+      color: #888;
+      margin-left: 10px;
+    }
+
+    .agent-status.working {
+      color: var(--warning);
+      border: 1px solid var(--warning);
+    }
+
+    .agent-status.idle {
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .agent-status.error {
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="pairing-view" class="container hidden">
+    <h1>AG Bridge</h1>
+    <p>Enter 6-digit code from laptop console</p>
+    <div class="mb-4">
+      <input type="text" id="code-input" placeholder="000000" maxlength="6" inputmode="numeric" />
+    </div>
+    <button onclick="attemptPair()">Connect</button>
+  </div>
+
+  <div id="dashboard-view" class="container hidden">
+    <header>
+      <div class="flex items-center">
+        <span id="ws-status" class="status-dot"></span>
+        <h2 style="font-size:18px;">Dashboard <span style="font-size:10px; opacity:0.5">v0.3.1</span></h2>
+        <span id="agent-status-pill" class="agent-status">Agent: ???</span>
+      </div>
+      <div class="flex gap-2">
+        <button id="strict-btn" class="secondary" style="width: auto; padding: 8px 12px; font-size: 14px;"
+          onclick="toggleStrict()">Strict: ?</button>
+        <button class="secondary" style="width: auto; padding: 8px 12px; font-size: 14px;"
+          onclick="logout()">Disconnect</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <h3>Comms</h3>
+      <div id="chat-thread" class="chat-container">
+        <div style="text-align:center; color:#666; padding:20px;">No messages</div>
+      </div>
+
+      <div class="chat-input-area">
+        <input type="text" id="chat-input" class="chat-input" placeholder="Message to Agent..."
+          onkeypress="handleEnter(event)">
+        <button onclick="sendChat()" style="width: auto;">Send</button>
+      </div>
+
+      <div class="quick-actions">
+        <button class="quick-btn" onclick="sendQuick('CONTINUE')">CONTINUE</button>
+        <button class="quick-btn" onclick="sendQuick('STOP')">STOP</button>
+        <button class="quick-btn" onclick="sendQuick('STATUS')">STATUS</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex justify-between items-center">
+        <div>
+          <div style="font-size: 32px; font-weight: bold;" id="pending-count">0</div>
+          <div style="font-size: 12px; color: var(--text-dim);">PENDING</div>
+        </div>
+        <div>
+          <button class="secondary" style="font-size: 12px; padding: 8px;" onclick="createTestApproval()">+ Test
+            (Debug)</button>
+          <button class="secondary" style="font-size: 12px; padding: 8px; margin-top: 4px;"
+            onclick="requestRealApproval()">+ Request (New)</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mb-4">Queue</h3>
+    <div id="approvals-list">
+      <!-- Approvals injected here -->
+      <p style="text-align:center; padding: 20px;">No approvals found.</p>
+    </div>
+
+    <div style="margin-top: 40px;">
+      <h3>Event Log</h3>
+      <div id="event-log"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = ''; // Relative path
+    let TOKEN = localStorage.getItem('ag-token');
+    let WS = null;
+
+    // --- Init ---
+    function init() {
+      // DEBUG: Alert to confirm JS running
+      // alert('DEBUG: Init running'); 
+      const savedToken = localStorage.getItem('ag-token');
+      if (savedToken) {
+        logEvent('Found token, loading dashboard...');
+        TOKEN = savedToken;
+        document.getElementById('pairing-view').classList.add('hidden');
+        document.getElementById('dashboard-view').classList.remove('hidden');
+
+        // Execute fetches and catch errors explicitly
+        fetchStatus().catch(e => logEvent('FetchStatus Error: ' + e.message));
+        fetchApprovals().catch(e => logEvent('FetchApprovals Error: ' + e.message));
+        fetchMessages().catch(e => logEvent('FetchMessages Error: ' + e.message));
+        fetchAgentStatus().catch(e => logEvent('FetchAgent Error: ' + e.message));
+
+        connectWS();
+      } else {
+        logEvent('No token found, showing pairing.');
+        document.getElementById('pairing-view').classList.remove('hidden');
+        document.getElementById('dashboard-view').classList.add('hidden');
+      }
+    }
+
+    function showPairing() {
+      document.getElementById('pairing-view').classList.remove('hidden');
+      document.getElementById('dashboard-view').classList.add('hidden');
+    }
+
+    function showDashboard() {
+      document.getElementById('pairing-view').classList.add('hidden');
+      document.getElementById('dashboard-view').classList.remove('hidden');
+      fetchStatus();
+      fetchApprovals();
+      fetchMessages();
+      fetchAgentStatus();
+      connectWS();
+    }
+
+    function logout() {
+      localStorage.removeItem('ag-token');
+      TOKEN = null;
+      if (WS) WS.close();
+      window.location.reload();
+    }
+
+    function logEvent(msg) {
+      const el = document.getElementById('event-log');
+      const div = document.createElement('div');
+      div.className = 'log-entry';
+      div.innerHTML = `<span>[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+      el.prepend(div);
+    }
+
+    // --- Auth ---
+    async function attemptPair() {
+      const code = document.getElementById('code-input').value.trim();
+      if (code.length < 6) return alert('Invalid code');
+
+      try {
+        const res = await fetch('/pair/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+
+        if (data.token) {
+          TOKEN = data.token;
+          localStorage.setItem('ag-token', TOKEN);
+          showDashboard();
+        } else {
+          alert('Pairing failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      }
+    }
+
+    async function api(path, method = 'GET', body = null) {
+      if (!TOKEN) return;
+      const opts = {
+        method,
+        headers: { 'x-ag-token': TOKEN, 'Content-Type': 'application/json' }
+      };
+      if (body) opts.body = JSON.stringify(body);
+
+      try {
+        const res = await fetch(path, opts);
+        if (res.status === 401) {
+          logEvent('API Unauthorized (401) - Logging out');
+          logout();
+          return null;
+        }
+        if (!res.ok) {
+          const txt = await res.text();
+          logEvent(`API Error ${res.status}: ${path} | ${txt}`);
+          return null;
+        }
+        return res.json();
+      } catch (e) {
+        logEvent('API Fetch Exception: ' + e.message);
+        // alert('API Fail: ' + e.message); // Uncomment if log invisible
+        return null;
+      }
+    }
+
+    // --- Data ---
+    // --- Chat & Agent ---
+    async function fetchMessages() {
+      const data = await api('/messages/inbox?limit=50');
+      if (data && data.messages) {
+        renderMessages(data.messages);
+      }
+    }
+
+    async function fetchAgentStatus() {
+      const data = await api('/agent/status');
+      if (data && data.agent) {
+        updateAgentUI(data.agent);
+      }
+    }
+
+    function renderMessages(msgs) {
+      const thread = document.getElementById('chat-thread');
+      if (msgs.length === 0) {
+        thread.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No messages</div>';
+        return;
+      }
+
+      thread.innerHTML = msgs.slice().reverse().map(m => {
+        const time = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `
+          <div class="msg ${m.from === 'agent' ? 'agent' : 'user'}">
+            <div class="msg-meta">
+              <span>${m.from.toUpperCase()}</span>
+              <span>${time}</span>
+            </div>
+            <div>${escapeHtml(m.text)}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Auto-scroll to bottom
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    function updateAgentUI(agent) {
+      const pill = document.getElementById('agent-status-pill');
+      pill.innerText = `Agent: ${agent.state.toUpperCase()}`;
+      pill.className = `agent-status ${agent.state}`;
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Optimistic UI update could go here, but let's wait for WS/ACK for simplicity
+      await api('/messages/send', 'POST', {
+        to: 'agent',
+        channel: 'work',
+        text: text
+      });
+
+      input.value = '';
+    }
+
+    function sendQuick(text) {
+      document.getElementById('chat-input').value = text;
+      sendChat();
+    }
+
+    function handleEnter(e) {
+      if (e.key === 'Enter') sendChat();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    // --- Data ---
+    async function fetchStatus() {
+      const data = await api('/status');
+      if (data && data.ok) {
+        document.getElementById('pending-count').innerText = data.pendingApprovals;
+        updateStrictUI(data.strictMode);
+      }
+    }
+
+    // fetchStatus defined below with strict mode support
+    async function fetchApprovals() {
+      const data = await api('/approvals');
+      if (data && data.approvals) {
+        renderApprovals(data.approvals);
+      }
+    }
+
+    function renderApprovals(list) {
+      const container = document.getElementById('approvals-list');
+      if (list.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding: 20px;">No approvals found.</p>';
+        return;
+      }
+
+      container.innerHTML = list.map(item => `
+        <div class="card approval-item status-${item.status}">
+          <div class="flex justify-between items-center mb-4">
+            <span class="tag ${item.status}">${item.status}</span>
+            <span style="font-size:12px; color:var(--text-dim)">${new Date(item.createdAt).toLocaleTimeString()}</span>
+          </div>
+          <div style="font-weight:bold; margin-bottom: 4px;">${item.kind}</div>
+          <pre>${JSON.stringify(item.details, null, 2)}</pre>
+          
+          ${item.status === 'pending' ? `
+            <div class="flex gap-2 mt-4">
+              <button class="danger" onclick="decide('${item.id}', 'deny')">Deny</button>
+              <button class="success" onclick="decide('${item.id}', 'approve')">Approve</button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function decide(id, decision) {
+      const res = await api(`/approvals/${id}/${decision}`, 'POST');
+      if (res && res.ok) {
+        fetchApprovals();
+        fetchStatus();
+      } else {
+        alert('Action failed');
+      }
+    }
+
+    async function createTestApproval() {
+      await api('/debug/create-approval', 'POST', {
+        kind: 'test_action',
+        details: { msg: 'This is a test from the dashboard', risk: 'none' }
+      });
+    }
+
+    async function requestRealApproval() {
+      await api('/approvals/request', 'POST', {
+        kind: 'command',
+        details: { cmd: 'pnpm test', cwd: '.', risk: 'yellow' },
+        risk: 'yellow',
+        clientTag: 'dashboard_manual'
+      });
+    }
+
+    async function toggleStrict() {
+      // Optimistic toggle
+      const btn = document.getElementById('strict-btn');
+      const isStrict = btn.innerText.includes('ON');
+      const newState = !isStrict;
+
+      const res = await api('/config/strict-mode', 'POST', { strictMode: newState });
+      if (res && res.ok) {
+        updateStrictUI(res.strictMode);
+      } else {
+        alert('Failed to toggle strict mode');
+      }
+    }
+
+    function updateStrictUI(isStrict) {
+      const btn = document.getElementById('strict-btn');
+      if (isStrict) {
+        btn.innerText = 'Strict: ON';
+        btn.style.borderColor = 'var(--success)';
+        btn.style.color = 'var(--success)';
+      } else {
+        btn.innerText = 'Strict: OFF';
+        btn.style.borderColor = 'var(--danger)';
+        btn.style.color = 'var(--danger)';
+      }
+    }
+
+    // --- WebSocket ---
+    function connectWS() {
+      if (!TOKEN) return;
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      WS = new WebSocket(`${proto}://${window.location.host}/events?token=${TOKEN}`);
+
+      WS.onopen = () => {
+        document.getElementById('ws-status').classList.add('connected');
+        logEvent('WS Connected');
+      };
+
+      WS.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data);
+          logEvent(`Event: ${data.event}`);
+
+          if (data.event === 'approval_requested' || data.event === 'approval_decided') {
+            fetchApprovals();
+            fetchStatus();
+          }
+          if (data.event === 'config_changed') {
+            updateStrictUI(data.payload.strictMode);
+          }
+          if (data.event === 'message_new') {
+            logEvent('New message received');
+            fetchMessages();
+          }
+          if (data.event === 'agent_status') {
+            updateAgentUI(data.payload);
+          }
+        } catch (e) { console.error('WS Error:', e); }
+      };
+
+      WS.onerror = (e) => {
+        console.error('WebSocket Error:', e);
+        logEvent('WS Error: ' + JSON.stringify(e));
+      };
+
+      WS.onclose = (e) => {
+        document.getElementById('ws-status').classList.remove('connected');
+        logEvent(`WS Closed (Code: ${e.code}). Reconnecting...`);
+        setTimeout(connectWS, 3000);
+      };
+    }
+
+    // Debug: Expose for console access
+    window.debugApi = api;
+    window.debugToken = () => TOKEN;
+
+    // Start
+    init();
+
+    // SW
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+  </script>
+</body>
+
+</html>
