@@ -1,0 +1,18 @@
+{
+    "allow": [
+        "^git (status|diff|log|fetch|pull|push|checkout|switch|commit|restore)\\b",
+        "^(npm|pnpm|yarn) (test|run|lint|build)\\b",
+        "^pytest\\b",
+        "^python -m (pytest|ruff|mypy)\\b"
+    ],
+    "deny": [
+        "\\brm\\b",
+        "\\bdel\\b",
+        "\\bformat\\b",
+        "\\bdiskpart\\b",
+        "\\bshutdown\\b",
+        "\\breboot\\b",
+        "\\bchmod\\b",
+        "\\bchown\\b"
+    ]
+}

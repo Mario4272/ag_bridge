@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="manifest.json">
   <title>AG Bridge</title>
   <style>
     :root {
@@ -15,6 +18,7 @@
       --danger: #ef4444;
       --border: #374151;
     }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -23,24 +27,60 @@
       padding: 0;
       -webkit-font-smoothing: antialiased;
     }
+
     .container {
       max-width: 600px;
       margin: 0 auto;
       padding: 20px;
       padding-bottom: 80px;
     }
-    h1, h2, h3 { margin: 0; font-weight: 600; }
-    h1 { font-size: 24px; margin-bottom: 8px; }
-    p { margin: 0 0 12px; color: var(--text-dim); line-height: 1.5; }
-    
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      font-weight: 600;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
     /* Utility */
-    .hidden { display: none !important; }
-    .flex { display: flex; }
-    .items-center { align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .gap-2 { gap: 8px; }
-    .mb-4 { margin-bottom: 16px; }
-    .mt-4 { margin-top: 16px; }
+    .hidden {
+      display: none !important;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-2 {
+      gap: 8px;
+    }
+
+    .mb-4 {
+      margin-bottom: 16px;
+    }
+
+    .mt-4 {
+      margin-top: 16px;
+    }
 
     /* Inputs & Buttons */
     input {
@@ -56,8 +96,11 @@
       text-align: center;
       letter-spacing: 2px;
     }
-    input:focus { border-color: var(--primary); }
-    
+
+    input:focus {
+      border-color: var(--primary);
+    }
+
     button {
       background: var(--primary);
       color: white;
@@ -70,11 +113,25 @@
       cursor: pointer;
       transition: opacity 0.2s;
     }
-    button:active { opacity: 0.8; }
-    button.secondary { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); }
-    button.danger { background: var(--danger); }
-    button.success { background: var(--success); }
-    
+
+    button:active {
+      opacity: 0.8;
+    }
+
+    button.secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.success {
+      background: var(--success);
+    }
+
     /* Views */
     #pairing-view {
       height: 90vh;
@@ -92,11 +149,20 @@
       margin-bottom: 16px;
       border: 1px solid var(--border);
     }
+
     .approval-item {
       border-left: 4px solid var(--primary);
     }
-    .approval-item.status-approved { border-left-color: var(--success); opacity: 0.6; }
-    .approval-item.status-denied { border-left-color: var(--danger); opacity: 0.6; }
+
+    .approval-item.status-approved {
+      border-left-color: var(--success);
+      opacity: 0.6;
+    }
+
+    .approval-item.status-denied {
+      border-left-color: var(--danger);
+      opacity: 0.6;
+    }
 
     .tag {
       font-size: 12px;
@@ -106,9 +172,21 @@
       text-transform: uppercase;
       font-weight: bold;
     }
-    .tag.pending { background: #d97706; color: white; }
-    .tag.approved { background: var(--success); color: white; }
-    .tag.denied { background: var(--danger); color: white; }
+
+    .tag.pending {
+      background: #d97706;
+      color: white;
+    }
+
+    .tag.approved {
+      background: var(--success);
+      color: white;
+    }
+
+    .tag.denied {
+      background: var(--danger);
+      color: white;
+    }
 
     pre {
       background: black;
@@ -130,9 +208,15 @@
       border-top: 1px solid var(--border);
       padding-top: 10px;
     }
-    .log-entry { margin-bottom: 4px; }
-    .log-entry span { color: var(--primary); }
-    
+
+    .log-entry {
+      margin-bottom: 4px;
+    }
+
+    .log-entry span {
+      color: var(--primary);
+    }
+
     /* Header */
     header {
       display: flex;
@@ -142,6 +226,7 @@
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
     }
+
     .status-dot {
       width: 10px;
       height: 10px;
@@ -150,9 +235,14 @@
       display: inline-block;
       margin-right: 6px;
     }
-    .status-dot.connected { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
   </style>
 </head>
+
 <body>
 
   <div id="pairing-view" class="container hidden">
@@ -170,7 +260,12 @@
         <span id="ws-status" class="status-dot"></span>
         <h2 style="font-size:18px;">Dashboard</h2>
       </div>
-      <button class="secondary" style="width: auto; padding: 8px 12px; font-size: 14px;" onclick="logout()">Disconnect</button>
+      <div class="flex gap-2">
+        <button id="strict-btn" class="secondary" style="width: auto; padding: 8px 12px; font-size: 14px;"
+          onclick="toggleStrict()">Strict: ?</button>
+        <button class="secondary" style="width: auto; padding: 8px 12px; font-size: 14px;"
+          onclick="logout()">Disconnect</button>
+      </div>
     </header>
 
     <div class="card">
@@ -180,7 +275,10 @@
           <div style="font-size: 12px; color: var(--text-dim);">PENDING</div>
         </div>
         <div>
-          <button class="secondary" style="font-size: 12px; padding: 8px;" onclick="createTestApproval()">+ Test Approval</button>
+          <button class="secondary" style="font-size: 12px; padding: 8px;" onclick="createTestApproval()">+ Test
+            (Debug)</button>
+          <button class="secondary" style="font-size: 12px; padding: 8px; margin-top: 4px;"
+            onclick="requestRealApproval()">+ Request (New)</button>
         </div>
       </div>
     </div>
@@ -243,7 +341,7 @@
     async function attemptPair() {
       const code = document.getElementById('code-input').value.trim();
       if (code.length < 6) return alert('Invalid code');
-      
+
       try {
         const res = await fetch('/pair/claim', {
           method: 'POST',
@@ -251,7 +349,7 @@
           body: JSON.stringify({ code })
         });
         const data = await res.json();
-        
+
         if (data.token) {
           TOKEN = data.token;
           localStorage.setItem('ag-token', TOKEN);
@@ -271,7 +369,7 @@
         headers: { 'x-ag-token': TOKEN, 'Content-Type': 'application/json' }
       };
       if (body) opts.body = JSON.stringify(body);
-      
+
       const res = await fetch(path, opts);
       if (res.status === 401) {
         logout();
@@ -281,10 +379,12 @@
     }
 
     // --- Data ---
-    async function fetchStatus() {
-      const data = await api('/status');
-      if (data && data.ok) {
-        document.getElementById('pending-count').innerText = data.pendingApprovals;
+    // --- Data ---
+    // fetchStatus defined below with strict mode support
+    async function fetchApprovals() {
+      const data = await api('/approvals');
+      if (data && data.approvals) {
+        renderApprovals(data.approvals);
       }
     }
 
@@ -301,7 +401,7 @@
         container.innerHTML = '<p style="text-align:center; padding: 20px;">No approvals found.</p>';
         return;
       }
-      
+
       container.innerHTML = list.map(item => `
         <div class="card approval-item status-${item.status}">
           <div class="flex justify-between items-center mb-4">
@@ -338,29 +438,68 @@
       });
     }
 
+    async function requestRealApproval() {
+      await api('/approvals/request', 'POST', {
+        kind: 'command',
+        details: { cmd: 'pnpm test', cwd: '.', risk: 'yellow' },
+        risk: 'yellow',
+        clientTag: 'dashboard_manual'
+      });
+    }
+
+    async function toggleStrict() {
+      // Optimistic toggle
+      const btn = document.getElementById('strict-btn');
+      const isStrict = btn.innerText.includes('ON');
+      const newState = !isStrict;
+
+      const res = await api('/config/strict-mode', 'POST', { strictMode: newState });
+      if (res && res.ok) {
+        updateStrictUI(res.strictMode);
+      } else {
+        alert('Failed to toggle strict mode');
+      }
+    }
+
+    function updateStrictUI(isStrict) {
+      const btn = document.getElementById('strict-btn');
+      if (isStrict) {
+        btn.innerText = 'Strict: ON';
+        btn.style.borderColor = 'var(--success)';
+        btn.style.color = 'var(--success)';
+      } else {
+        btn.innerText = 'Strict: OFF';
+        btn.style.borderColor = 'var(--danger)';
+        btn.style.color = 'var(--danger)';
+      }
+    }
+
     // --- WebSocket ---
     function connectWS() {
       if (!TOKEN) return;
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
       WS = new WebSocket(`${proto}://${window.location.host}/events?token=${TOKEN}`);
-      
+
       WS.onopen = () => {
         document.getElementById('ws-status').classList.add('connected');
         logEvent('Connected to server');
       };
-      
+
       WS.onmessage = (msg) => {
         try {
           const data = JSON.parse(msg.data);
           logEvent(`Event: ${data.event}`);
-          
+
           if (data.event === 'approval_requested' || data.event === 'approval_decided') {
             fetchApprovals();
             fetchStatus();
           }
+          if (data.event === 'config_changed') {
+            updateStrictUI(data.payload.strictMode);
+          }
         } catch (e) { console.error(e); }
       };
-      
+
       WS.onclose = () => {
         document.getElementById('ws-status').classList.remove('connected');
         logEvent('Disconnected. Reconnecting...');
@@ -369,7 +508,14 @@
     }
 
     // Start
+    // Start
     init();
+
+    // SW
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
   </script>
 </body>
+
 </html>
