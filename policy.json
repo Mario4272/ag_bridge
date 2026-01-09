@@ -1,18 +1,18 @@
 {
     "allow": [
-        "^echo",
-        "^ls",
-        "^dir",
-        "^pnpm test",
-        "^npm test",
-        "^git status"
+        "^git (status|diff|log|fetch|pull|push|checkout|switch|commit|restore)\\b",
+        "^(npm|pnpm|yarn) (test|run|lint|build)\\b",
+        "^pytest\\b",
+        "^python -m (pytest|ruff|mypy)\\b"
     ],
     "deny": [
-        "rm ",
-        "del ",
-        "format ",
-        "mv ",
-        "chmod ",
-        "chown "
+        "\\brm\\b",
+        "\\bdel\\b",
+        "\\bformat\\b",
+        "\\bdiskpart\\b",
+        "\\bshutdown\\b",
+        "\\breboot\\b",
+        "\\bchmod\\b",
+        "\\bchown\\b"
     ]
 }
