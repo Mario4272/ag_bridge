@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { networkInterfaces } from 'os';
 import crypto from 'crypto';
 import { mkdir, readFile, writeFile, rename } from 'fs/promises';
+import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -18,6 +19,84 @@ const app = express();
 const server = createServer(app);
 // Don't bind 'server' here so we can handle upgrade manually for auth
 const wss = new WebSocketServer({ noServer: true });
+
+// --- Poke Logic ---
+let pokeInFlight = false;
+let lastPokeAt = 0;
+let retryTimer = null;
+let retryAttempts = 0;
+
+async function runPokeScript() {
+    return new Promise((resolve) => {
+        const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true });
+        let stdout = '';
+        child.stdout.on('data', d => stdout += d);
+        child.on('close', () => {
+            try { resolve(JSON.parse(stdout)); } catch { resolve({ ok: false, error: 'parse_error', stdout }); }
+        });
+        child.on('error', (err) => resolve({ ok: false, error: 'spawn_error', details: err.message }));
+    });
+}
+
+function stopRetry() {
+    if (retryTimer) {
+        clearInterval(retryTimer);
+        retryTimer = null;
+    }
+    retryAttempts = 0;
+}
+
+function startRetry() {
+    if (retryTimer) return;
+    retryAttempts = 0;
+    console.log('[POKE] Agent busy. Starting retry loop...');
+    retryTimer = setInterval(async () => {
+        retryAttempts++;
+        if (retryAttempts > 24) { // 2 minutes
+            console.log('[POKE] Retry limit reached. Giving up.');
+            stopRetry();
+            return;
+        }
+        await tryPoke(true);
+    }, 5000);
+}
+
+async function tryPoke(isRetry = false) {
+    if (pokeInFlight) return;
+
+    // Throttle 2s
+    if (Date.now() - lastPokeAt < 2000) return;
+
+    pokeInFlight = true;
+    lastPokeAt = Date.now();
+
+    if (!isRetry) console.log('[POKE] Attempting to wake agent...');
+    const res = await runPokeScript();
+    pokeInFlight = false;
+
+    if (res.ok) {
+        console.log('[POKE] Success:', res.method);
+        stopRetry();
+    } else if (res.reason && res.reason.includes('busy')) {
+        // Agent is busy
+        if (!isRetry) console.log('[POKE] Agent busy. Scheduling retries.');
+        startRetry();
+    } else {
+        console.warn('[POKE] Failed/Error:', JSON.stringify(res));
+        // Stop retrying on hard errors (like no CDP connection)
+        stopRetry();
+    }
+}
+
+function schedulePoke() {
+    if (pokeInFlight) return;
+    // If we are already retrying, we don't need to kickstart it, 
+    // but effectively the "new message" ensures we keep trying if we were about to expire? 
+    // For now, just let the existing loop run or start a new attempt.
+    if (retryTimer) return;
+
+    tryPoke(false);
+}
 
 // --- State ---
 // Persistent State
@@ -316,6 +395,12 @@ app.post('/messages/send', checkAuth, (req, res) => {
     saveState();
 
     broadcast('message_new', msg);
+
+    // Trigger Poke if msg is for agent
+    if (to === 'agent') {
+        schedulePoke();
+    }
+
     res.json({ ok: true, message: msg });
 });
 
