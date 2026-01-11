@@ -3,13 +3,15 @@ import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { networkInterfaces } from 'os';
 import crypto from 'crypto';
-import { mkdir, readFile, writeFile, rename } from 'fs/promises';
+import { mkdir, readFile, writeFile, rename, appendFile } from 'fs/promises';
 import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, 'data');
+const LOGS_DIR = join(__dirname, '.logs');
+const LOG_FILE = join(LOGS_DIR, `ag-bridge-${new Date().toISOString().split('T')[0]}.log`);
 const STATE_FILE = join(DATA_DIR, 'state.json');
 const POLICY_FILE = join(__dirname, 'policy.json');
 let POLICY = { allow: [], deny: [] };
@@ -32,9 +34,19 @@ async function runPokeScript() {
         let stdout = '';
         child.stdout.on('data', d => stdout += d);
         child.on('close', () => {
-            try { resolve(JSON.parse(stdout)); } catch { resolve({ ok: false, error: 'parse_error', stdout }); }
+            try {
+                const res = JSON.parse(stdout);
+                log('POKE', 'Script result', res);
+                resolve(res);
+            } catch {
+                log('POKE', 'Parse error', { stdout });
+                resolve({ ok: false, error: 'parse_error', stdout });
+            }
         });
-        child.on('error', (err) => resolve({ ok: false, error: 'spawn_error', details: err.message }));
+        child.on('error', (err) => {
+            log('POKE', 'Spawn error', err.message);
+            resolve({ ok: false, error: 'spawn_error', details: err.message });
+        });
     });
 }
 
@@ -49,11 +61,11 @@ function stopRetry() {
 function startRetry() {
     if (retryTimer) return;
     retryAttempts = 0;
-    console.log('[POKE] Agent busy. Starting retry loop...');
+    log('POKE', 'Agent busy. Starting retry loop...');
     retryTimer = setInterval(async () => {
         retryAttempts++;
         if (retryAttempts > 24) { // 2 minutes
-            console.log('[POKE] Retry limit reached. Giving up.');
+            log('POKE', 'Retry limit reached. Giving up.');
             stopRetry();
             return;
         }
@@ -70,19 +82,19 @@ async function tryPoke(isRetry = false) {
     pokeInFlight = true;
     lastPokeAt = Date.now();
 
-    if (!isRetry) console.log('[POKE] Attempting to wake agent...');
+    if (!isRetry) log('POKE', 'Attempting to wake agent...');
     const res = await runPokeScript();
     pokeInFlight = false;
 
     if (res.ok) {
-        console.log('[POKE] Success:', res.method);
+        log('POKE', 'Success', { method: res.method });
         stopRetry();
     } else if (res.reason && res.reason.includes('busy')) {
         // Agent is busy
-        if (!isRetry) console.log('[POKE] Agent busy. Scheduling retries.');
+        if (!isRetry) log('POKE', 'Agent busy. Scheduling retries.');
         startRetry();
     } else {
-        console.warn('[POKE] Failed/Error:', JSON.stringify(res));
+        log('POKE', 'Failed/Error', res);
         // Stop retrying on hard errors (like no CDP connection)
         stopRetry();
     }
@@ -90,10 +102,14 @@ async function tryPoke(isRetry = false) {
 
 function schedulePoke() {
     if (pokeInFlight) return;
-    // If we are already retrying, we don't need to kickstart it, 
-    // but effectively the "new message" ensures we keep trying if we were about to expire? 
-    // For now, just let the existing loop run or start a new attempt.
-    if (retryTimer) return;
+
+    // Dedupe: If we are already retrying, we don't need to kickstart it.
+    // However, if we aren't retrying, and a poke is not in flight, we should try.
+    // The throttle in tryPoke handles the "too fast" case.
+    if (retryTimer) {
+        log('POKE', 'Skipping schedulePoke: Retry loop already active.');
+        return;
+    }
 
     tryPoke(false);
 }
@@ -149,6 +165,16 @@ function broadcast(event, payload) {
     }
 }
 
+// --- Logging ---
+async function log(component, message, data = null) {
+    const ts = new Date().toISOString();
+    const line = `[${ts}] [${component}] ${message} ${data ? JSON.stringify(data) : ''}`;
+    console.log(line);
+    try {
+        await appendFile(LOG_FILE, line + '\n');
+    } catch (e) { /* ignore log errors */ }
+}
+
 // --- Persistence ---
 let saveTimeout = null;
 async function saveState() {
@@ -168,9 +194,10 @@ async function saveState() {
             const tempFile = `${STATE_FILE}.tmp`;
             await writeFile(tempFile, JSON.stringify(data, null, 2));
             await rename(tempFile, STATE_FILE);
-            console.log('[PERSIST] State saved.');
+            await rename(tempFile, STATE_FILE);
+            log('PERSIST', 'State saved.');
         } catch (err) {
-            console.error('[PERSIST] Failed to save state:', err);
+            log('PERSIST', 'Failed to save state:', err.message);
         }
     }, 250); // Debounce 250ms
 }
@@ -179,9 +206,9 @@ async function loadPolicy() {
     try {
         const raw = await readFile(POLICY_FILE, 'utf-8');
         POLICY = JSON.parse(raw);
-        console.log('[POLICY] Loaded policy.json');
+        log('POLICY', 'Loaded policy.json');
     } catch (err) {
-        console.warn('[POLICY] policy.json not found or invalid. Using defaults.');
+        log('POLICY', 'policy.json not found or invalid. Using defaults.');
     }
 }
 
@@ -205,15 +232,15 @@ async function loadState() {
         console.log(`[PERSIST] State loaded. ${STATE.approvals.length} approvals, ${TOKENS.size} tokens.`);
     } catch (err) {
         if (err.code === 'ENOENT') {
-            console.log('[PERSIST] No state file found. Starting fresh.');
+            log('PERSIST', 'No state file found. Starting fresh.');
             await saveState();
         } else {
-            console.error('[PERSIST] Failed to load state:', err);
+            log('PERSIST', 'Failed to load state:', err.message);
             // Logic to rename bad file could go here, but simple logging is fine for v0.2
             const badFile = `${STATE_FILE}.bad.${Date.now()}`;
             try {
                 await rename(STATE_FILE, badFile);
-                console.warn(`[PERSIST] Corrupt state file renamed to ${badFile}`);
+                log('PERSIST', `Corrupt state file renamed to ${badFile}`);
             } catch (e) { /* ignore */ }
         }
     }
@@ -302,16 +329,8 @@ app.post('/config/strict-mode', requireAuth, (req, res) => {
     res.json({ ok: true, strictMode });
 });
 
-app.get('/status', requireAuth, (req, res) => {
-    const pending = STATE.approvals.filter(a => a.status === 'pending').length;
-    res.json({
-        ok: true,
-        ts: new Date().toISOString(),
-        pendingApprovals: pending,
-        totalApprovals: STATE.approvals.length,
-        strictMode: STATE.strictMode
-    });
-});
+// Migrated to usage of single /status endpoint below
+// app.get('/status', requireAuth, ...);
 
 app.get('/approvals', requireAuth, (req, res) => {
     const sorted = [...STATE.approvals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -455,6 +474,32 @@ app.post('/agent/heartbeat', checkAuth, (req, res) => {
 // GET /agent/status
 app.get('/agent/status', checkAuth, (req, res) => {
     res.json({ ok: true, agent: STATE.agent });
+});
+
+// GET /status (Observability)
+app.get('/status', requireAuth, (req, res) => {
+    const pending = STATE.approvals.filter(a => a.status === 'pending').length;
+    res.json({
+        ok: true,
+        version: "0.4.1",
+        ts: new Date().toISOString(),
+        pendingApprovals: pending,
+        totalApprovals: STATE.approvals.length,
+        strictMode: STATE.strictMode,
+        cdp: {
+            enabled: true, // v0.x assumption
+            poke_in_flight: pokeInFlight,
+            retry_active: !!retryTimer
+        },
+        agent: {
+            state: STATE.agent.state,
+            last_seen: STATE.agent.lastSeen
+        },
+        server: {
+            uptime: process.uptime(),
+            clients: wss.clients.size
+        }
+    });
 });
 
 // POST /checkpoint

@@ -5,6 +5,10 @@ yarn-debug.log*
 yarn-error.log*
 .npm/
 
+# Logs
+.logs/
+*.log
+
 # OS / System
 .DS_Store
 Thumbs.db
@@ -27,6 +31,5 @@ test_mcp_init.json
 
 # Antigravity / Gemini
 .gemini/
-
-
-
+.env
+*.local
