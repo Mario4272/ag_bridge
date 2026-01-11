@@ -5,25 +5,25 @@ Chat with your AI agent from your couch, verify tasks, and "poke" it to wake up�
 
 ## Features
 - 📱 **Mobile Chat UI**: Full chat interface with history.
-- 🩸 **The Poke**: Remotely wakes up the Agent in VS Code (no manual typing needed!).
+- 🩸 **The Poke**: Remotely wakes up the Agent in Antigravity (no manual typing needed!).
 - 🔒 **LAN Only**: Your data stays on your network. No cloud databases.
 - 🔌 **MCP Integration**: Agent can read messages and report status directly.
 
 ## Architecture
-`Phone` <-> `Bridge Server` <-> `VS Code (Agent)`
+`Phone` <-> `Bridge Server` <-> `Antigravity (Agent)`
 (See [Architecture](docs/architecture.md) for details).
 
 ## Requirements
 - **Node.js**: v18+
-- **VS Code**: Launched with `--remote-debugging-port=9000` via terminal.
+- **Antigravity**: Launched with `--remote-debugging-port=9000` via terminal.
 - **Network**: Both PC and Phone on same Wi-Fi.
 
 ## Quick Start
 
-### 1. Start VS Code (Critical)
-You **must** start VS Code from a terminal to enable the Poke:
+### 1. Start AG (Critical)
+You **must** start AG from a terminal to enable the Poke:
 ```bash
-code . --remote-debugging-port=9000
+antigravity.exe . --remote-debugging-port=9000
 ```
 *(If the Agent doesn't "wake up", this is usually why.)*
 
