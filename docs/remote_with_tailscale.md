@@ -15,13 +15,13 @@ Tailscale is a private network that connects your devices securely. It allows yo
 
 ## 3. Run AG Bridge
 
-Run the bridge with the `--remote` flag to enable Tailscale detection:
-
-```bash
-npm start
-```
-
-The console will print a **Remote URL** (e.g., `http://my-pc:8787` or `http://100.x.y.z:8787`).
+Run the bridge (Tailscale detection is automatic):
+ 
+ ```bash
+ npm start
+ ```
+ 
+ The console will print a **Remote URL** (e.g., `http://my-pc:8787` or `http://100.x.y.z:8787`) if Tailscale is running.
 
 ## 4. Connect
 

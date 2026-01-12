@@ -151,19 +151,19 @@ function generateToken() {
 
 function getLocalIPs() {
     const nets = networkInterfaces();
-    const results = [];
+    const results = new Set();
     for (const name of Object.keys(nets)) {
         for (const net of nets[name]) {
+            // Skip internal (non-127.0.0.1) and non-IPv4
             if (net.family === 'IPv4' && !net.internal) {
                 // Filter out Tailscale IPs (100.x.x.x) from the "Local" list
-                // Standard CGNAT range is 100.64.0.0/10, but Tailscale uses 100.x range.
                 if (!net.address.startsWith('100.')) {
-                    results.push(net.address);
+                    results.add(net.address);
                 }
             }
         }
     }
-    return results;
+    return Array.from(results);
 }
 
 function getTailscaleInfo() {
