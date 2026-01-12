@@ -30,3 +30,25 @@ We follow a **structured feature-branch workflow** to ensure stability in `main`
 - **`main`**: Production-ready code. Protected.
 - **`dev`**: Integration branch for next release.
 - **`feat/*`**: (Optional) Feature branches for complex work.
+
+## IMPORTANT
+- ## Security non-negotiables (read this twice)
+- **Do not commit secrets**: auth keys, tokens, cookies, Tailnet info, pairing codes, etc.
+- **Do not commit runtime state** (example: `data/state.json` must be template-only or generated at runtime).
+- If you suspect you committed a secret: rotate it immediately and tell the maintainer.
+
+## Unicode / Hidden character policy
+- PRs **must not** introduce hidden/bidirectional (bidi) Unicode control characters.
+- If GitHub flags “hidden or bidirectional Unicode text”, the PR must be cleaned/normalized before merge.
+
+## PR checklist
+- [ ] `npm install` + `npm start` works
+- [ ] Tests/lint pass (if present)
+- [ ] No secrets or runtime state committed
+- [ ] Docs updated if behavior changed
+- [ ] Changes are small and focused (one feature/fix per PR)
+
+## Network features (Tailscale / remote access)
+- Remote access must be **opt-in**
+- Do not rely on “VPN == auth”; app-layer auth still required
+- Bind/listen interfaces must be explicit (avoid exposing to 0.0.0.0 unintentionally)
