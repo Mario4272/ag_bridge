@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "strictMode": true,
+    "approvals": [],
+    "messages": [],
+    "agent": {
+        "state": "idle",
+        "lastSeen": null,
+        "task": "",
+        "note": ""
+    },
+    "checkpoints": [],
+    "tokens": []
+}

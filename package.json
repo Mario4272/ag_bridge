@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "check:bidi": "node scripts/check-bidi.mjs"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +17,9 @@
     "express": "^5.2.1",
     "ws": "^8.19.0",
     "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2",
+    "vitest": "^4.0.17"
   }
 }

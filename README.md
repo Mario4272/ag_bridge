@@ -36,8 +36,32 @@ You will see a **Pairing Code** and **IP Address** in the console.
 
 ### 3. Open on Phone
 1. Go to `http://<YOUR_IP>:8787` on your phone.
-2. Enter the Pairing Code.
-3. Chat away!
+3. Enter the Pairing Code.
+4. Chat away!
+
+## Remote Access (Optional) ☁️
+AG Bridge is designed as a **LAN-first** tool. It binds to `0.0.0.0` to be accessible on your local Wi-Fi.
+
+**For remote access (outside your home):**
+- **Recommended**: Use **Tailscale** (or wireguard) to create a secure mesh network.
+- **Warning**: Do NOT forward port 8787 directly to the open internet. The token auth is robust, but the server is not hardened for public exposure.
+- **Note**: Using a VPN/Tailscale does NOT bypass authentication; you will still need to pair your device.
+
+## Testing & CI 🧪
+To run the test suite locally:
+```bash
+npm test
+```
+(Runs unit tests and smoke tests via Vitest)
+
+To scan for repo hygiene issues:
+```bash
+npm run check:bidi
+```
+(Scans for hidden Unicode characters)
+
+**CI**: GitHub Actions automatically runs these tests on every Pull Request.
+
 
 ## Documentation
 - [Architecture](docs/architecture.md)

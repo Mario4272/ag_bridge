@@ -43,7 +43,11 @@ We follow a **structured feature-branch workflow** to ensure stability in `main`
 
 ## PR checklist
 - [ ] `npm install` + `npm start` works
-- [ ] Tests/lint pass (if present)
+- [ ] `npm test` passes (Smoke tests + Secrets scan)
+- [ ] `npm start` works
+- [ ] No secrets or keys committed
+- [ ] No runtime state (`data/state.json`) committed
+- [ ] No hidden/bidi Unicode warnings (`npm run check:bidi`)
 - [ ] No secrets or runtime state committed
 - [ ] Docs updated if behavior changed
 - [ ] Changes are small and focused (one feature/fix per PR)

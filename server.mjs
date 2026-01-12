@@ -17,10 +17,10 @@ const POLICY_FILE = join(__dirname, 'policy.json');
 let POLICY = { allow: [], deny: [] };
 
 const PORT = 8787;
-const app = express();
-const server = createServer(app);
+export const app = express();
+export const server = createServer(app);
 // Don't bind 'server' here so we can handle upgrade manually for auth
-const wss = new WebSocketServer({ noServer: true });
+export const wss = new WebSocketServer({ noServer: true });
 
 // --- Poke Logic ---
 let pokeInFlight = false;
@@ -297,7 +297,7 @@ const checkAuth = requireAuth; // Alias for consistency with new endpoints
 
 // Public
 app.get('/health', (req, res) => {
-    res.json({ ok: true, ts: new Date().toISOString() });
+    res.json({ ok: true, name: "ag_bridge", version: "0.5.0", ts: new Date().toISOString() });
 });
 
 app.post('/pair/claim', (req, res) => {
@@ -600,18 +600,20 @@ wss.on('connection', (ws) => {
 
 // --- Start ---
 // Load state then start
-Promise.all([loadState(), loadPolicy()]).then(() => {
-    server.listen(PORT, '0.0.0.0', () => {
-        const ips = getLocalIPs();
-        console.log('='.repeat(50));
-        console.log(` AG Bridge v1 running on port ${PORT}`);
-        console.log('='.repeat(50));
-        console.log(` PAIRING CODE: [ ${PAIRING_CODE} ]`);
-        console.log('-'.repeat(50));
-        console.log(' Open on your phone:');
-        ips.forEach(ip => {
-            console.log(` http://${ip}:${PORT}`);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    Promise.all([loadState(), loadPolicy()]).then(() => {
+        server.listen(PORT, '0.0.0.0', () => {
+            const ips = getLocalIPs();
+            console.log('='.repeat(50));
+            console.log(` AG Bridge v1 running on port ${PORT}`);
+            console.log('='.repeat(50));
+            console.log(` PAIRING CODE: [ ${PAIRING_CODE} ]`);
+            console.log('-'.repeat(50));
+            console.log(' Open on your phone:');
+            ips.forEach(ip => {
+                console.log(` http://${ip}:${PORT}`);
+            });
+            console.log('='.repeat(50));
         });
-        console.log('='.repeat(50));
     });
-});
+}
