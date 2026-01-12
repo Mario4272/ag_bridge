@@ -1,5 +1,19 @@
 {
   "version": 1,
   "strictMode": true,
-  "approvals": []
+  "approvals": [],
+  "messages": [],
+  "agent": {
+    "state": "idle",
+    "lastSeen": null,
+    "task": "",
+    "note": ""
+  },
+  "checkpoints": [],
+  "tokens": [
+    "ea7bbd86cff4cb1df537b9982b2dba23",
+    "04d2f3f4092e30b2cbe78efd6db28ce6",
+    "b83927bf6872fb81ba4998d8036f4dc7",
+    "0a4799059b0f186ba5229d962866ec1d"
+  ]
 }
