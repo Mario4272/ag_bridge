@@ -6,6 +6,7 @@
 ## Core Assumptions
 1. **Local Network Trust**: We assume your home Wi-Fi is secure. Anyone on the LAN can access the bridge if they have the IP working pair code/token.
 2. **No Cloud**: Data never leaves your local network (except what you explicitly ask the Agent to do).
+3. **Tailscale Note**: If using Tailscale for remote access, connections are end-to-end encrypted. In some network conditions, Tailscale may route traffic through [DERP relays](https://tailscale.com/kb/1232/derp-servers) for NAT traversal—this is still encrypted and Tailscale cannot see your data.
 
 ## Authentication
 - **Pairing**: A 6-digit `PAIRING_CODE` is printed in the server console on startup.

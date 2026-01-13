@@ -16,7 +16,7 @@ Chat with your AI agent from your couch, verify tasks, and "poke" it to wake upâ
 ## Requirements
 - **Node.js**: v18+
 - **Antigravity**: Launched with `--remote-debugging-port=9000` via terminal.
-- **Network**: Both PC and Phone on same Wi-Fi.
+- **Network**: Same Wi-Fi **OR** [Tailscale](docs/remote_with_tailscale.md) for remote access.
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ Chat with your AI agent from your couch, verify tasks, and "poke" it to wake upâ
 You **must** start AG from a terminal to enable the Poke:
 ```bash
 antigravity.exe . --remote-debugging-port=9000
-```
+
 *(If the Agent doesn't "wake up", this is usually why.)*
 
 ### 2. Install & Start Bridge
