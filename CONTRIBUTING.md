@@ -9,27 +9,25 @@ We follow a **structured feature-branch workflow** to ensure stability in `main`
 2.  **Pull Requests**: Merge changes from `dev` into `main` via Pull Request (PR).
 3.  **Releases**: `main` is always stable and tagged with versions (e.g., `v0.1`).
 
-## How to Contribute
-1.  **Checkout Dev**:
-    ```bash
-    git checkout dev
-    ```
-2.  **Make Changes**: Implement your feature or fix.
-3.  **Commit**:
-    ```bash
-    git add .
-    git commit -m "feat: description of change"
-    ```
-4.  **Push**:
-    ```bash
-    git push origin dev
-    ```
-5.  **Merge**: Open a PR to merge `dev` into `main`.
+## Branching Strategy
+- **`main`**: 🛡️ **Stable / Production**. Protected branch. No direct commits. Only accepts PRs from `dev`.
+- **`dev`**: 🧪 **Integration / Staging**. The default branch for testing.
+- **`feat/xxx`** or **`fix/xxx`**: 🔨 **Working Branches**. Short-lived branches for specific tasks.
 
-## Branching Stratergy
-- **`main`**: Production-ready code. Protected.
-- **`dev`**: Integration branch for next release.
-- **`feat/*`**: (Optional) Feature branches for complex work.
+## How to Contribute
+
+### Core Team (You)
+1.  **Branch off `dev`**: `git checkout -b feat/my-cool-feature dev`
+2.  **Work & Push**: `git push origin feat/my-cool-feature`
+3.  **PR**: Open Pull Request to **merge `feat/xxx` into `dev`**.
+4.  **Release**: Periodically PR `dev` -> `main` for a numbered release (v0.x).
+
+### External Contributors (Community)
+1.  **Fork** the repo to their own account.
+2.  **Clone** their fork.
+3.  **Branch** off `dev`.
+4.  **PR**: Open Pull Request to **upstream `dev`**.
+    - *Why `dev`?* So we can test integration before hitting `main`.
 
 ## IMPORTANT
 - ## Security non-negotiables (read this twice)
