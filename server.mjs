@@ -224,7 +224,6 @@ async function saveState() {
             const tempFile = `${STATE_FILE}.tmp`;
             await writeFile(tempFile, JSON.stringify(data, null, 2));
             await rename(tempFile, STATE_FILE);
-            await rename(tempFile, STATE_FILE);
             log('PERSIST', 'State saved.');
         } catch (err) {
             log('PERSIST', 'Failed to save state:', err.message);
