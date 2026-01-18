@@ -70,3 +70,6 @@ npm run check:bidi
 
 ## License
 MIT. Built for the Antigravity community.
+
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md).
