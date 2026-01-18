@@ -11,6 +11,7 @@ import path from 'path';
 const AG_BRIDGE_URL = process.env.AG_BRIDGE_URL || "http://127.0.0.1:8787";
 const AG_BRIDGE_TOKEN = process.env.AG_BRIDGE_TOKEN || ""; // Optional
 const AG_REPO_ROOT = process.env.AG_REPO_ROOT ? path.resolve(process.env.AG_REPO_ROOT) : process.cwd();
+const AG_NTFY_TOPIC = process.env.AG_NTFY_TOPIC || "ag_bridge_alerts"; // Public default!
 
 // --- Helpers ---
 async function api(method, endpoint, body) {
@@ -196,6 +197,35 @@ const TOOLS = {
             await walk(AG_REPO_ROOT);
             return { content: [{ type: "text", text: JSON.stringify(files, null, 2) }] };
         }
+    },
+
+    notify_user: {
+        schema: z.object({
+            message: z.string(),
+            title: z.string().optional(),
+            priority: z.enum(["min", "low", "default", "high", "urgent"]).optional(),
+            tags: z.array(z.string()).optional()
+        }),
+        handler: async (args) => {
+            const topic = AG_NTFY_TOPIC;
+            try {
+                const headers = {};
+                if (args.title) headers["Title"] = args.title;
+                if (args.priority) headers["Priority"] = args.priority;
+                if (args.tags) headers["Tags"] = args.tags.join(",");
+
+                const res = await fetch(`https://ntfy.sh/${topic}`, {
+                    method: "POST",
+                    body: args.message,
+                    headers
+                });
+
+                if (!res.ok) throw new Error(`Status ${res.status}`);
+                return { content: [{ type: "text", text: `Notification sent to ntfy.sh/${topic}` }] };
+            } catch (err) {
+                return { content: [{ type: "text", text: `Failed to send notification: ${err.message}` }], isError: true };
+            }
+        }
     }
 };
 
@@ -320,6 +350,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         pattern: { type: "string" },
                         limit: { type: "number" }
                     }
+                }
+            },
+            {
+                name: "notify_user",
+                description: "Send push notification via ntfy.sh",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        message: { type: "string" },
+                        title: { type: "string" },
+                        priority: { type: "string", enum: ["min", "low", "default", "high", "urgent"] },
+                        tags: { type: "array", items: { type: "string" } }
+                    },
+                    required: ["message"]
                 }
             }
         ]
