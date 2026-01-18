@@ -1,9 +1,10 @@
 {
   "name": "ag-bridge",
-  "version": "1.0.0",
+  "version": "0.6.0",
   "description": "LAN-only companion app for agent supervision",
   "main": "server.mjs",
   "type": "module",
+  "bin": "./bin/install.mjs",
   "scripts": {
     "start": "node server.mjs",
     "test": "vitest run",
@@ -11,7 +12,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
     "express": "^5.2.1",

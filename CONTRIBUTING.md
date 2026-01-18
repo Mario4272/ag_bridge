@@ -2,6 +2,9 @@
 
 We follow a **structured feature-branch workflow** to ensure stability in `main`.
 
+## License
+By submitting a pull request, you agree that your contribution is licensed under the MIT License (see `LICENSE`).
+
 ## Workflow Summary
 **`dev` -> PR -> `main`**
 

@@ -13,8 +13,9 @@ const DATA_DIR = join(__dirname, 'data');
 const LOGS_DIR = join(__dirname, '.logs');
 const LOG_FILE = join(LOGS_DIR, `ag-bridge-${new Date().toISOString().split('T')[0]}.log`);
 const STATE_FILE = join(DATA_DIR, 'state.json');
+const APPROVALS_FILE = join(DATA_DIR, 'approvals.json');
 const POLICY_FILE = join(__dirname, 'policy.json');
-let POLICY = { allow: [], deny: [] };
+let POLICY = { version: 2, profiles: { relaxed: { allow: [".*"] }, balanced: { allow: [] } }, globalDeny: [] };
 
 // --- Config ---
 const args = process.argv.slice(2);
@@ -215,20 +216,31 @@ async function saveState() {
             const data = {
                 version: STATE.version,
                 strictMode: STATE.strictMode,
-                approvals: STATE.approvals,
+                // approvals: STATE.approvals, // Scoped to approvals.json now
                 messages: STATE.messages,
                 agent: STATE.agent,
                 checkpoints: STATE.checkpoints,
-                tokens: Array.from(TOKENS) // Persist tokens
+                tokens: Array.from(TOKENS)
             };
             const tempFile = `${STATE_FILE}.tmp`;
             await writeFile(tempFile, JSON.stringify(data, null, 2));
             await rename(tempFile, STATE_FILE);
-            log('PERSIST', 'State saved.');
+            log('PERSIST', 'State saved (config/msgs).');
         } catch (err) {
             log('PERSIST', 'Failed to save state:', err.message);
         }
-    }, 250); // Debounce 250ms
+    }, 250);
+}
+
+async function saveApprovals() {
+    try {
+        const tempFile = `${APPROVALS_FILE}.tmp`;
+        await writeFile(tempFile, JSON.stringify(STATE.approvals, null, 2));
+        await rename(tempFile, APPROVALS_FILE);
+        log('PERSIST', `Approvals saved (${STATE.approvals.length}).`);
+    } catch (err) {
+        log('PERSIST', 'Failed to save approvals:', err.message);
+    }
 }
 
 async function loadPolicy() {
@@ -249,13 +261,33 @@ async function loadState() {
 
         if (data.version) STATE.version = data.version;
         if (typeof data.strictMode === 'boolean') STATE.strictMode = data.strictMode;
-        if (Array.isArray(data.approvals)) STATE.approvals = data.approvals;
+        // if (Array.isArray(data.approvals)) STATE.approvals = data.approvals; // Legacy load
         if (Array.isArray(data.messages)) STATE.messages = data.messages;
         if (data.agent) STATE.agent = data.agent;
         if (Array.isArray(data.checkpoints)) STATE.checkpoints = data.checkpoints;
         if (Array.isArray(data.tokens)) {
             STATE.tokens = data.tokens;
             TOKENS = new Set(data.tokens);
+        }
+
+        // Load Approvals (Separate File)
+        try {
+            const rawApprovals = await readFile(APPROVALS_FILE, 'utf-8');
+            const approvalsData = JSON.parse(rawApprovals);
+            if (Array.isArray(approvalsData)) {
+                STATE.approvals = approvalsData;
+            }
+        } catch (e) {
+            if (e.code === 'ENOENT') {
+                // Migration: Check if state.json had approvals
+                if (Array.isArray(data.approvals) && data.approvals.length > 0) {
+                    log('PERSIST', 'Migrating approvals from state.json to approvals.json');
+                    STATE.approvals = data.approvals;
+                    await saveApprovals();
+                }
+            } else {
+                log('PERSIST', 'Failed to load approvals.json', e.message);
+            }
         }
 
         console.log(`[PERSIST] State loaded. ${STATE.approvals.length} approvals, ${TOKENS.size} tokens.`);
@@ -278,28 +310,40 @@ async function loadState() {
 function checkPolicy(cmd) {
     if (!cmd) return { allowed: false, error: 'missing_command' };
 
-    // Deny list (Always wins)
-    for (const pattern of POLICY.deny || []) {
+    // 1. Global Deny (Always wins)
+    for (const pattern of POLICY.globalDeny || []) {
         if (new RegExp(pattern).test(cmd)) {
-            return { allowed: false, error: 'command_denied' };
+            return { allowed: false, error: 'global_denied' };
         }
     }
 
-    // Allow list (Only if strictMode)
-    if (STATE.strictMode) {
-        let matched = false;
-        for (const pattern of POLICY.allow || []) {
-            if (new RegExp(pattern).test(cmd)) {
-                matched = true;
-                break;
-            }
-        }
-        if (!matched) {
-            return { allowed: false, error: 'command_not_allowlisted' };
+    // 2. Determine Profile (Map v0.5 boolean to v0.6 profiles)
+    // strictMode=true -> 'balanced', strictMode=false -> 'relaxed'
+    // Future: STATE.securityProfile could hold 'paranoid' etc.
+    const profileName = STATE.strictMode ? 'balanced' : 'relaxed';
+    const profile = POLICY.profiles?.[profileName];
+
+    if (!profile) {
+        // Fallback safety: if profile invalid, BLOCK ALL unless relaxed was intended?
+        // Better to be safe.
+        return { allowed: false, error: 'invalid_policy_profile' };
+    }
+
+    // 3. Profile Deny
+    for (const pattern of profile.deny || []) {
+        if (new RegExp(pattern).test(cmd)) {
+            return { allowed: false, error: 'profile_denied' };
         }
     }
 
-    return { allowed: true };
+    // 4. Profile Allow
+    for (const pattern of profile.allow || []) {
+        if (new RegExp(pattern).test(cmd)) {
+            return { allowed: true };
+        }
+    }
+
+    return { allowed: false, error: 'command_not_allowlisted' };
 }
 
 // --- Middleware ---
@@ -377,7 +421,7 @@ app.post('/approvals/:id/approve', requireAuth, (req, res) => {
 
     approval.status = 'approved';
     approval.decidedAt = new Date().toISOString();
-    saveState();
+    saveApprovals();
 
     console.log(`[APPROVAL] ${id} APPROVED`);
     broadcast('approval_decided', { id, status: 'approved' });
@@ -395,7 +439,7 @@ app.post('/approvals/:id/deny', requireAuth, (req, res) => {
 
     approval.status = 'denied';
     approval.decidedAt = new Date().toISOString();
-    saveState();
+    saveApprovals();
 
     console.log(`[APPROVAL] ${id} DENIED`);
     broadcast('approval_decided', { id, status: 'denied' });
@@ -414,7 +458,7 @@ app.post('/debug/create-approval', requireAuth, (req, res) => {
     };
 
     STATE.approvals.push(newApproval);
-    saveState();
+    saveApprovals();
     console.log(`[DEBUG] Created test approval ${newApproval.id}`);
     broadcast('approval_requested', newApproval);
     res.json(newApproval);
@@ -574,7 +618,7 @@ app.post('/approvals/request', checkAuth, (req, res) => {
     };
 
     STATE.approvals.push(newApproval);
-    saveState();
+    saveApprovals(); // Changed from saveState()
     console.log(`[REQUEST] Approval requested: ${newApproval.id} (${kind})`);
     broadcast('approval_requested', newApproval);
     res.json({ ok: true, approval: newApproval });
