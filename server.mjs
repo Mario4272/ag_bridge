@@ -710,7 +710,11 @@ wss.on('connection', (ws) => {
 // --- Start ---
 // Load state then start
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    Promise.all([loadState(), loadPolicy()]).then(() => {
+    Promise.all([loadState(), loadPolicy()]).then(async () => {
+        // Dynamic import for ESM compatibility if needed, or standard import
+        let qrcode = null;
+        try { qrcode = await import('qrcode-terminal'); } catch (e) { console.log('[WARN] qrcode-terminal not found'); }
+
         server.listen(PORT, HOST, () => {
             const ips = getLocalIPs();
             const ts = getTailscaleInfo();
@@ -721,10 +725,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             console.log(` PAIRING CODE: [ ${PAIRING_CODE} ]`);
             console.log('-'.repeat(50));
 
+            let qrUrl = null;
+
             console.log(' Local (same Wi-Fi):');
             if (ips.length > 0) {
                 ips.forEach(ip => {
-                    console.log(` http://${ip}:${PORT}`);
+                    const url = `http://${ip}:${PORT}`;
+                    console.log(` ${url}`);
+                    if (!qrUrl) qrUrl = url; // Fallback
                 });
             } else {
                 console.log(' (No local LAN IP found)');
@@ -733,10 +741,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             if (ts) {
                 console.log('\n Remote (Tailscale Active):');
                 if (ts.name) {
-                    console.log(` http://${ts.name}:${PORT}`);
+                    const url = `http://${ts.name}:${PORT}`;
+                    console.log(` ${url}`);
+                    qrUrl = url; // Priority 1: Tailscale DNS
                 }
                 ts.ips.forEach(ip => {
-                    console.log(` http://${ip}:${PORT}`);
+                    const url = `http://${ip}:${PORT}`;
+                    console.log(` ${url}`);
+                    if (!qrUrl) qrUrl = url; // Priority 2: Tailscale IP
                 });
             } else {
                 console.log('\n Remote (Tailscale Inactive):');
@@ -744,6 +756,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             }
 
             console.log('='.repeat(50));
+
+            // Generate QR Code
+            if (qrUrl && qrcode) {
+                const fullUrl = `${qrUrl}?code=${PAIRING_CODE}`;
+                console.log('\nScan to Connect:');
+                qrcode.default.generate(fullUrl, { small: true });
+                console.log(`(Encoded: ${fullUrl})`);
+                console.log('='.repeat(50));
+            }
         });
     });
 }

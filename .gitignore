@@ -33,3 +33,4 @@ test_mcp_init.json
 .gemini/
 .env
 *.local
+data/approvals.json
