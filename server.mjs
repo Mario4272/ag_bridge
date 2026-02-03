@@ -40,14 +40,36 @@ let retryTimer = null;
 let retryAttempts = 0;
 
 async function runPokeScript() {
+    // Find the oldest "new" message for the agent to send
+    const pendingMsg = STATE.messages
+        .filter(m => m.to === 'agent' && m.status === 'new')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+
+    const msgText = pendingMsg ? pendingMsg.text : "check inbox";
+    const env = { ...process.env, AG_POKE_MESSAGE: msgText };
+
+    if (pendingMsg) {
+        log('POKE', `Injecting message: "${msgText}" (ID: ${pendingMsg.id})`);
+    } else {
+        log('POKE', 'No new messages. Sending default wake-up poke.');
+    }
+
     return new Promise((resolve) => {
-        const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true });
+        const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true, env });
         let stdout = '';
         child.stdout.on('data', d => stdout += d);
         child.on('close', () => {
             try {
                 const res = JSON.parse(stdout);
                 log('POKE', 'Script result', res);
+
+                // If successful, mark message as poked so we don't send it again
+                if (res.ok && pendingMsg) {
+                    pendingMsg.status = 'poked';
+                    saveState();
+                    log('POKE', `Marked message ${pendingMsg.id} as poked.`);
+                }
+
                 resolve(res);
             } catch {
                 log('POKE', 'Parse error', { stdout });
@@ -468,6 +490,7 @@ app.post('/debug/create-approval', requireAuth, (req, res) => {
 
 // POST /messages/send
 app.post('/messages/send', checkAuth, (req, res) => {
+    console.log('[DEBUG] HEX DUMP /messages/send body:', JSON.stringify(req.body));
     const { to, channel, text, from } = req.body;
     if (!to || !text) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
