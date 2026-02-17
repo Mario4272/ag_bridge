@@ -40,14 +40,43 @@ let retryTimer = null;
 let retryAttempts = 0;
 
 async function runPokeScript() {
+    // Find ALL "new" messages for the agent
+    const pendingMsgs = STATE.messages
+        .filter(m => m.to === 'agent' && m.status === 'new')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    if (pendingMsgs.length === 0) {
+        log('POKE', 'No new messages. Sending default wake-up poke.');
+    }
+
+    // Combine messages if multiple
+    let msgText = "check inbox";
+    if (pendingMsgs.length > 0) {
+        msgText = pendingMsgs.map(m => m.text).join('\n\n');
+        log('POKE', `Injecting ${pendingMsgs.length} messages. Total length: ${msgText.length}`);
+    }
+
+    const env = { ...process.env, AG_POKE_MESSAGE: msgText };
+
     return new Promise((resolve) => {
-        const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true });
+        const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true, env });
         let stdout = '';
         child.stdout.on('data', d => stdout += d);
         child.on('close', () => {
             try {
                 const res = JSON.parse(stdout);
                 log('POKE', 'Script result', res);
+
+                // If successful, mark ALL messages as poked
+                if (res.ok && pendingMsgs.length > 0) {
+                    pendingMsgs.forEach(m => {
+                        m.status = 'poked';
+                        broadcast('message_ack', { id: m.id, status: 'poked' });
+                    });
+                    saveState();
+                    log('POKE', `Marked ${pendingMsgs.length} messages as poked.`);
+                }
+
                 resolve(res);
             } catch {
                 log('POKE', 'Parse error', { stdout });
@@ -99,14 +128,24 @@ async function tryPoke(isRetry = false) {
 
     if (res.ok) {
         log('POKE', 'Success', { method: res.method });
+        // Update agent status to show we are processing
+        STATE.agent.state = 'working';
+        STATE.agent.lastSeen = new Date().toISOString();
+        saveState();
+        broadcast('agent_status', STATE.agent);
         stopRetry();
     } else if (res.reason && res.reason.includes('busy')) {
         // Agent is busy
         if (!isRetry) log('POKE', 'Agent busy. Scheduling retries.');
+
+        // Notify client
+        STATE.agent.state = 'busy';
+        STATE.agent.lastSeen = new Date().toISOString();
+        broadcast('agent_status', STATE.agent);
+
         startRetry();
     } else {
         log('POKE', 'Failed/Error', res);
-        // Stop retrying on hard errors (like no CDP connection)
         stopRetry();
     }
 }
@@ -468,16 +507,20 @@ app.post('/debug/create-approval', requireAuth, (req, res) => {
 
 // POST /messages/send
 app.post('/messages/send', checkAuth, (req, res) => {
-    const { to, channel, text, from } = req.body;
+    console.log('[DEBUG] HEX DUMP /messages/send body:', JSON.stringify(req.body));
+    const { to, channel, text } = req.body;
+    let { from } = req.body;
+    from = from || 'user'; // Default to user if missing
+
     if (!to || !text) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
     const msg = {
         id: 'msg_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
         createdAt: new Date().toISOString(),
-        from: from || 'user', // 'user' (phone) or 'agent'
+        from,
         to, // 'agent' or 'user'
         channel: channel || 'general',
-        text,
+        text: (from === 'user' ? '[Mobile] ' : '') + text,
         status: 'new'
     };
 
@@ -671,6 +714,9 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (ws) => {
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     ws.send(JSON.stringify({ event: 'hello', payload: { ts: new Date().toISOString() } }));
 
     // Replay pending approvals
@@ -684,10 +730,28 @@ wss.on('connection', (ws) => {
     }
 });
 
+// Heartbeat Interval (30s)
+const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
+
+wss.on('close', () => {
+    clearInterval(interval);
+});
+
 // --- Start ---
 // Load state then start
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    Promise.all([loadState(), loadPolicy()]).then(() => {
+    Promise.all([loadState(), loadPolicy()]).then(async () => {
+        // Dynamic import for ESM compatibility if needed, or standard import
+        let qrcode = null;
+        try { qrcode = await import('qrcode-terminal'); } catch (e) { console.log('[WARN] qrcode-terminal not found'); }
+
         server.listen(PORT, HOST, () => {
             const ips = getLocalIPs();
             const ts = getTailscaleInfo();
@@ -698,10 +762,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             console.log(` PAIRING CODE: [ ${PAIRING_CODE} ]`);
             console.log('-'.repeat(50));
 
+            let qrUrl = null;
+
             console.log(' Local (same Wi-Fi):');
             if (ips.length > 0) {
                 ips.forEach(ip => {
-                    console.log(` http://${ip}:${PORT}`);
+                    const url = `http://${ip}:${PORT}`;
+                    console.log(` ${url}`);
+                    if (!qrUrl) qrUrl = url; // Fallback
                 });
             } else {
                 console.log(' (No local LAN IP found)');
@@ -710,10 +778,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             if (ts) {
                 console.log('\n Remote (Tailscale Active):');
                 if (ts.name) {
-                    console.log(` http://${ts.name}:${PORT}`);
+                    const url = `http://${ts.name}:${PORT}`;
+                    console.log(` ${url}`);
+                    qrUrl = url; // Priority 1: Tailscale DNS
                 }
                 ts.ips.forEach(ip => {
-                    console.log(` http://${ip}:${PORT}`);
+                    const url = `http://${ip}:${PORT}`;
+                    console.log(` ${url}`);
+                    if (!qrUrl) qrUrl = url; // Priority 2: Tailscale IP
                 });
             } else {
                 console.log('\n Remote (Tailscale Inactive):');
@@ -721,6 +793,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
             }
 
             console.log('='.repeat(50));
+
+            // Generate QR Code
+            if (qrUrl && qrcode) {
+                const fullUrl = `${qrUrl}?code=${PAIRING_CODE}`;
+                console.log('\nScan to Connect:');
+                qrcode.default.generate(fullUrl, { small: true });
+                console.log(`(Encoded: ${fullUrl})`);
+                console.log('='.repeat(50));
+            }
         });
     });
 }

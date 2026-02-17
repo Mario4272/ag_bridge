@@ -320,8 +320,9 @@
     }
 
     .agent-status.working {
-      color: var(--warning);
-      border: 1px solid var(--warning);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      background: rgba(239, 68, 68, 0.1); /* Subtle red tint */
     }
 
     .agent-status.idle {
@@ -432,6 +433,16 @@
 
         connectWS();
       } else {
+        // Auto-pair from URL
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        if (code) {
+             document.getElementById('code-input').value = code;
+             logEvent('Auto-pairing with code from URL...');
+             attemptPair();
+             return;
+        }
+
         logEvent('No token found, showing pairing.');
         document.getElementById('pairing-view').classList.remove('hidden');
         document.getElementById('dashboard-view').classList.add('hidden');
