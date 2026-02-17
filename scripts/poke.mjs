@@ -167,12 +167,20 @@ async function main() {
             console.warn(`[BRIDGE] Port ${port} targets:`);
             list.forEach(t => console.warn(` - ${t.url} (${t.title})`));
 
-            // Priority 1: Standard Workbench (Main Window) - Reverted priority
-            // We reverted because the agent-specific target appears empty in CDP execution.
-            // We will trust the "Deep Scan" (iframe) logic to find the agent in the main window.
-            let found = list.find(t => t.url.includes('workbench.html') || (t.title && t.title.includes('workbench')));
+            // Priority 0: User Override (AG_CDP_TARGET_FILTER)
+            const filter = process.env.AG_CDP_TARGET_FILTER;
+            let found = null;
+            if (filter) {
+                console.warn(`[BRIDGE] Applying filter: "${filter}"`);
+                found = list.find(t => (t.url && t.url.includes(filter)) || (t.title && t.title.includes(filter)));
+            }
 
-            // Priority 2: Fallback to agent specific if main not found (unlikely)
+            // Priority 1: Standard Workbench (Main Window)
+            if (!found) {
+                found = list.find(t => t.url.includes('workbench.html') || (t.title && t.title.includes('workbench')));
+            }
+
+            // Priority 2: Fallback to agent specific
             if (!found) {
                 found = list.find(t => t.url.includes('workbench-jetski-agent.html'));
             }
@@ -180,115 +188,119 @@ async function main() {
             if (found && found.webSocketDebuggerUrl) {
                 target = found;
                 webSocketDebuggerUrl = found.webSocketDebuggerUrl;
-                console.warn(`[BRIDGE] Selected target: ${found.url}`);
+                console.warn(`[BRIDGE] Selected target: ${found.url} "${found.title}"`);
                 break;
             }
+            if (found && !found.webSocketDebuggerUrl) {
+                console.warn(`[BRIDGE] Found target but no WebSocket URL (Node?): ${found.url}`);
+            }
         } catch (e) { }
-    }
+    } catch (e) { }
+}
 
-    if (!webSocketDebuggerUrl) {
-        console.log(JSON.stringify({ ok: false, error: "cdp_not_found", details: "Is VS Code started with --remote-debugging-port=9000?" }));
-        process.exit(0);
-    }
+if (!webSocketDebuggerUrl) {
+    console.log(JSON.stringify({ ok: false, error: "cdp_not_found", details: "Is VS Code started with --remote-debugging-port=9000?" }));
+    process.exit(0);
+}
 
-    // 2. Connect via WS
-    const ws = new WebSocket(webSocketDebuggerUrl);
+// 2. Connect via WS
+const ws = new WebSocket(webSocketDebuggerUrl);
 
-    await new Promise((resolve, reject) => {
-        ws.on('open', resolve);
-        ws.on('error', reject);
-    });
+await new Promise((resolve, reject) => {
+    ws.on('open', resolve);
+    ws.on('error', reject);
+});
 
-    let idCounter = 1;
-    const call = (method, params) => new Promise((resolve, reject) => {
-        const id = idCounter++;
-        const handler = (msg) => {
-            const data = JSON.parse(msg);
-            if (data.id === id) {
-                ws.off('message', handler);
-                if (data.error) reject(data.error);
-                else resolve(data.result);
-            }
-        };
-        ws.on('message', handler);
-        // Add a timeout to reject if no response comes
-        setTimeout(() => {
+let idCounter = 1;
+const call = (method, params) => new Promise((resolve, reject) => {
+    const id = idCounter++;
+    const handler = (msg) => {
+        const data = JSON.parse(msg);
+        if (data.id === id) {
             ws.off('message', handler);
-            reject(new Error("RPC Timeout"));
-        }, 3000);
+            if (data.error) reject(data.error);
+            else resolve(data.result);
+        }
+    };
+    ws.on('message', handler);
+    // Add a timeout to reject if no response comes
+    setTimeout(() => {
+        ws.off('message', handler);
+        reject(new Error("RPC Timeout"));
+    }, 3000);
 
-        ws.send(JSON.stringify({ id, method, params }));
-    });
+    ws.send(JSON.stringify({ id, method, params }));
+});
 
-    const contexts = [];
-    ws.on('message', (msg) => {
-        try {
-            const data = JSON.parse(msg);
-            if (data.method === 'Runtime.executionContextCreated') {
-                contexts.push(data.params.context);
-            }
-        } catch { }
-    });
-
+const contexts = [];
+ws.on('message', (msg) => {
     try {
-        await call("Runtime.enable", {});
-        // Wait for contexts to be discovered
-        await new Promise(r => setTimeout(r, 800)); // Slightly longer wait for contexts
-
-        let pokeResult = null;
-        let diagnosticData = [];
-
-        // 3. Loop through contexts to find one that works
-        for (const ctx of contexts) {
-            try {
-                // Try Poking. The script itself now checks for editor presence safely.
-                const evalPoke = await call("Runtime.evaluate", {
-                    expression: expression,
-                    returnByValue: true,
-                    awaitPromise: true, // Important for async script
-                    contextId: ctx.id
-                });
-
-                if (evalPoke.result && evalPoke.result.value) {
-                    const res = evalPoke.result.value;
-
-                    if (res.ok) {
-                        pokeResult = res;
-                        break; // Success!
-                    }
-                    else if (res.reason === "busy_cancel_visible") {
-                        pokeResult = { ok: false, reason: "busy" };
-                        break; // Busy is a definitive state
-                    }
-                    // Capture diagnostics from failed attempts
-                    if (res.diagnostics) {
-                        diagnosticData.push({ contextId: ctx.id, diagnostics: res.diagnostics });
-                    }
-                }
-            } catch (ignore) { }
+        const data = JSON.parse(msg);
+        if (data.method === 'Runtime.executionContextCreated') {
+            contexts.push(data.params.context);
         }
+    } catch { }
+});
 
-        if (pokeResult) {
-            console.log(JSON.stringify(pokeResult));
-        } else {
-            // If we get here, no context worked
-            console.log(JSON.stringify({
-                ok: false,
-                error: "editor_not_found_in_any_context",
-                contextCount: contexts.length,
-                diagnostics: diagnosticData,
-                scannedConfigs: {
-                    port: webSocketDebuggerUrl ? "found" : "missing",
-                    target: target ? target.url : "unknown"
+try {
+    await call("Runtime.enable", {});
+    // Wait for contexts to be discovered
+    await new Promise(r => setTimeout(r, 800)); // Slightly longer wait for contexts
+
+    let pokeResult = null;
+    let diagnosticData = [];
+
+    // 3. Loop through contexts to find one that works
+    for (const ctx of contexts) {
+        try {
+            // Try Poking. The script itself now checks for editor presence safely.
+            const evalPoke = await call("Runtime.evaluate", {
+                expression: expression,
+                returnByValue: true,
+                awaitPromise: true, // Important for async script
+                contextId: ctx.id
+            });
+
+            if (evalPoke.result && evalPoke.result.value) {
+                const res = evalPoke.result.value;
+
+                if (res.ok) {
+                    pokeResult = res;
+                    break; // Success!
                 }
-            }));
-        }
-
-    } catch (err) {
-        console.log(JSON.stringify({ ok: false, error: "runtime_error", details: err.message }));
-    } finally {
-        ws.terminate();
+                else if (res.reason === "busy_cancel_visible") {
+                    pokeResult = { ok: false, reason: "busy" };
+                    break; // Busy is a definitive state
+                }
+                // Capture diagnostics from failed attempts
+                if (res.diagnostics) {
+                    diagnosticData.push({ contextId: ctx.id, diagnostics: res.diagnostics });
+                }
+            }
+        } catch (ignore) { }
     }
+
+    if (pokeResult) {
+        console.log(JSON.stringify(pokeResult));
+    } else {
+        // If we get here, no context worked
+        console.log(JSON.stringify({
+            ok: false,
+            error: "editor_not_found_in_any_context",
+            contextCount: contexts.length,
+            diagnostics: diagnosticData,
+            scannedConfigs: {
+                port: webSocketDebuggerUrl ? "found" : "missing",
+                target: target ? target.url : "unknown"
+            }
+        }));
+    }
+
+} catch (err) {
+    console.log(JSON.stringify({ ok: false, error: "runtime_error", details: err.message }));
+} finally {
+    ws.terminate();
+}
 }
 
 main().catch(err => {

@@ -28,7 +28,7 @@ sequenceDiagram
 ### 1. Bridge Server (`server.mjs`)
 - **Role**: The central coordinator.
 - **Stack**: Node.js + Express (HTTP) + `ws` (WebSocket) + `ws` (CDP Client).
-- **Persistence**: `data/state.json` (Messages, Approvals, Agent Status, Tokens).
+- **Persistence**: `data/state.json` (Messages, Agent Status, Tokens), `data/approvals.json` (Approvals).
 - **Security**: LAN-only, Token-based Auth (Headers: `x-ag-token`).
 
 ### 2. "The Poke" (`scripts/poke.mjs`)
