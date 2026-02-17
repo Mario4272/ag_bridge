@@ -4,8 +4,9 @@
 Chat with your AI agent from your couch, verify tasks, and "poke" it to wake up—all from your phone.
 
 ## Features
-- 📱 **Mobile Chat UI**: Full chat interface with history.
-- 🩸 **The Poke**: Remotely wakes up the Agent in Antigravity (no manual typing needed!).
+- 📱 **Mobile Chat UI**: Full chat interface with history and `[Mobile]` context prefix.
+- 🩸 **The Poke & Batching**: Remotely wakes up the Agent. Queued messages are batched for better context.
+- 💓 **Heartbeat**: Real-time connection status indicator (Green/Red).
 - 🔒 **LAN Only**: Your data stays on your network. No cloud databases.
 - 🔌 **MCP Integration**: Agent can read messages and report status directly.
 
