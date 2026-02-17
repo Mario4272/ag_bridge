@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+
 import http from 'http';
 
 // Configuration
@@ -25,7 +25,6 @@ const EXPRESSION_BUSY = `(() => {
 })()`;
 
 // Logic: Inject "check inbox" and submit
-// Logic: Inject text and submit (Robust + Iframe Support)
 const makePokeExpression = (messageContent) => `(async () => {
     // 1. Check for blocking "Cancel" button (Agent is busy)
     const cancel = document.querySelector('[data-tooltip-id="input-send-button-cancel-tooltip"]');
@@ -195,114 +194,125 @@ async function main() {
                 console.warn(`[BRIDGE] Found target but no WebSocket URL (Node?): ${found.url}`);
             }
         } catch (e) { }
-    } catch (e) { }
-}
+    }
 
-if (!webSocketDebuggerUrl) {
-    console.log(JSON.stringify({ ok: false, error: "cdp_not_found", details: "Is VS Code started with --remote-debugging-port=9000?" }));
-    process.exit(0);
-}
+    if (!webSocketDebuggerUrl) {
+        console.log(JSON.stringify({ ok: false, error: "cdp_not_found", details: "Is VS Code started with --remote-debugging-port=9000?" }));
+        process.exit(0);
+    }
 
-// 2. Connect via WS
-const ws = new WebSocket(webSocketDebuggerUrl);
-
-await new Promise((resolve, reject) => {
-    ws.on('open', resolve);
-    ws.on('error', reject);
-});
-
-let idCounter = 1;
-const call = (method, params) => new Promise((resolve, reject) => {
-    const id = idCounter++;
-    const handler = (msg) => {
-        const data = JSON.parse(msg);
-        if (data.id === id) {
-            ws.off('message', handler);
-            if (data.error) reject(data.error);
-            else resolve(data.result);
-        }
-    };
-    ws.on('message', handler);
-    // Add a timeout to reject if no response comes
-    setTimeout(() => {
-        ws.off('message', handler);
-        reject(new Error("RPC Timeout"));
-    }, 3000);
-
-    ws.send(JSON.stringify({ id, method, params }));
-});
-
-const contexts = [];
-ws.on('message', (msg) => {
-    try {
-        const data = JSON.parse(msg);
-        if (data.method === 'Runtime.executionContextCreated') {
-            contexts.push(data.params.context);
-        }
-    } catch { }
-});
-
-try {
-    await call("Runtime.enable", {});
-    // Wait for contexts to be discovered
-    await new Promise(r => setTimeout(r, 800)); // Slightly longer wait for contexts
-
-    let pokeResult = null;
-    let diagnosticData = [];
-
-    // 3. Loop through contexts to find one that works
-    for (const ctx of contexts) {
+    // 2. Connect via WS
+    // Node.js v22 has global WebSocket. Fallback to 'ws' package if needed.
+    let WebSocketClass = global.WebSocket;
+    if (!WebSocketClass) {
         try {
-            // Try Poking. The script itself now checks for editor presence safely.
-            const evalPoke = await call("Runtime.evaluate", {
-                expression: expression,
-                returnByValue: true,
-                awaitPromise: true, // Important for async script
-                contextId: ctx.id
-            });
-
-            if (evalPoke.result && evalPoke.result.value) {
-                const res = evalPoke.result.value;
-
-                if (res.ok) {
-                    pokeResult = res;
-                    break; // Success!
-                }
-                else if (res.reason === "busy_cancel_visible") {
-                    pokeResult = { ok: false, reason: "busy" };
-                    break; // Busy is a definitive state
-                }
-                // Capture diagnostics from failed attempts
-                if (res.diagnostics) {
-                    diagnosticData.push({ contextId: ctx.id, diagnostics: res.diagnostics });
-                }
-            }
-        } catch (ignore) { }
+            const wsModule = await import('ws');
+            WebSocketClass = wsModule.default;
+        } catch (e) {
+            console.log(JSON.stringify({ ok: false, error: "ws_module_missing", details: e.message }));
+            process.exit(1);
+        }
     }
+    const ws = new WebSocketClass(webSocketDebuggerUrl);
 
-    if (pokeResult) {
-        console.log(JSON.stringify(pokeResult));
-    } else {
-        // If we get here, no context worked
-        console.log(JSON.stringify({
-            ok: false,
-            error: "editor_not_found_in_any_context",
-            contextCount: contexts.length,
-            diagnostics: diagnosticData,
-            scannedConfigs: {
-                port: webSocketDebuggerUrl ? "found" : "missing",
-                target: target ? target.url : "unknown"
+    await new Promise((resolve, reject) => {
+        ws.onopen = resolve;
+        ws.onerror = reject;
+    });
+
+    let idCounter = 1;
+    const call = (method, params) => new Promise((resolve, reject) => {
+        const id = idCounter++;
+        const handler = (msg) => {
+            const data = JSON.parse(msg.data); // WS native event.data
+            if (data.id === id) {
+                ws.removeEventListener('message', handler);
+                if (data.error) reject(data.error);
+                else resolve(data.result);
             }
-        }));
-    }
+        };
+        ws.addEventListener('message', handler);
+        // Add a timeout to reject if no response comes
+        setTimeout(() => {
+            ws.removeEventListener('message', handler);
+            reject(new Error("RPC Timeout"));
+        }, 3000);
 
-} catch (err) {
-    console.log(JSON.stringify({ ok: false, error: "runtime_error", details: err.message }));
-} finally {
-    ws.terminate();
-}
+        ws.send(JSON.stringify({ id, method, params }));
+    });
+
+    const contexts = [];
+    ws.addEventListener('message', (msg) => {
+        try {
+            const data = JSON.parse(msg.data);
+            if (data.method === 'Runtime.executionContextCreated') {
+                contexts.push(data.params.context);
+            }
+        } catch { }
+    });
+
+    try {
+        await call("Runtime.enable", {});
+        // Wait for contexts to be discovered
+        await new Promise(r => setTimeout(r, 800)); // Slightly longer wait for contexts
+
+        let pokeResult = null;
+        let diagnosticData = [];
+
+        // 3. Loop through contexts to find one that works
+        for (const ctx of contexts) {
+            try {
+                // Try Poking. The script itself now checks for editor presence safely.
+                const evalPoke = await call("Runtime.evaluate", {
+                    expression: expression,
+                    returnByValue: true,
+                    awaitPromise: true, // Important for async script
+                    contextId: ctx.id
+                });
+
+                if (evalPoke.result && evalPoke.result.value) {
+                    const res = evalPoke.result.value;
+
+                    if (res.ok) {
+                        pokeResult = res;
+                        break; // Success!
+                    }
+                    else if (res.reason === "busy_cancel_visible") {
+                        pokeResult = { ok: false, reason: "busy" };
+                        break; // Busy is a definitive state
+                    }
+                    // Capture diagnostics from failed attempts
+                    if (res.diagnostics) {
+                        diagnosticData.push({ contextId: ctx.id, diagnostics: res.diagnostics });
+                    }
+                }
+            } catch (ignore) { }
+        }
+
+        if (pokeResult) {
+            console.log(JSON.stringify(pokeResult));
+        } else {
+            // If we get here, no context worked
+            console.log(JSON.stringify({
+                ok: false,
+                error: "editor_not_found_in_any_context",
+                contextCount: contexts.length,
+                diagnostics: diagnosticData,
+                scannedConfigs: {
+                    port: webSocketDebuggerUrl ? "found" : "missing",
+                    target: target ? target.url : "unknown"
+                }
+            }));
+        }
+
+    } catch (err) {
+        console.log(JSON.stringify({ ok: false, error: "runtime_error", details: err.message }));
+    } finally {
+        ws.close();
+    }
 }
 
 main().catch(err => {
     console.log(JSON.stringify({ ok: false, error: "script_error", details: err.message }));
+    process.exit(1);
 });

@@ -694,6 +694,9 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (ws) => {
+    ws.isAlive = true;
+    ws.on('pong', () => { ws.isAlive = true; });
+
     ws.send(JSON.stringify({ event: 'hello', payload: { ts: new Date().toISOString() } }));
 
     // Replay pending approvals
@@ -705,6 +708,20 @@ wss.on('connection', (ws) => {
             ts: new Date().toISOString()
         }));
     }
+});
+
+// Heartbeat Interval (30s)
+const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+        if (ws.isAlive === false) return ws.terminate();
+
+        ws.isAlive = false;
+        ws.ping();
+    });
+}, 30000);
+
+wss.on('close', () => {
+    clearInterval(interval);
 });
 
 // --- Start ---
