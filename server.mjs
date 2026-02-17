@@ -40,19 +40,23 @@ let retryTimer = null;
 let retryAttempts = 0;
 
 async function runPokeScript() {
-    // Find the oldest "new" message for the agent to send
-    const pendingMsg = STATE.messages
+    // Find ALL "new" messages for the agent
+    const pendingMsgs = STATE.messages
         .filter(m => m.to === 'agent' && m.status === 'new')
-        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    const msgText = pendingMsg ? pendingMsg.text : "check inbox";
-    const env = { ...process.env, AG_POKE_MESSAGE: msgText };
-
-    if (pendingMsg) {
-        log('POKE', `Injecting message: "${msgText}" (ID: ${pendingMsg.id})`);
-    } else {
+    if (pendingMsgs.length === 0) {
         log('POKE', 'No new messages. Sending default wake-up poke.');
     }
+
+    // Combine messages if multiple
+    let msgText = "check inbox";
+    if (pendingMsgs.length > 0) {
+        msgText = pendingMsgs.map(m => m.text).join('\n\n');
+        log('POKE', `Injecting ${pendingMsgs.length} messages. Total length: ${msgText.length}`);
+    }
+
+    const env = { ...process.env, AG_POKE_MESSAGE: msgText };
 
     return new Promise((resolve) => {
         const child = spawn('node', ['scripts/poke.mjs'], { cwd: process.cwd(), shell: true, env });
@@ -63,11 +67,14 @@ async function runPokeScript() {
                 const res = JSON.parse(stdout);
                 log('POKE', 'Script result', res);
 
-                // If successful, mark message as poked so we don't send it again
-                if (res.ok && pendingMsg) {
-                    pendingMsg.status = 'poked';
+                // If successful, mark ALL messages as poked
+                if (res.ok && pendingMsgs.length > 0) {
+                    pendingMsgs.forEach(m => {
+                        m.status = 'poked';
+                        broadcast('message_ack', { id: m.id, status: 'poked' });
+                    });
                     saveState();
-                    log('POKE', `Marked message ${pendingMsg.id} as poked.`);
+                    log('POKE', `Marked ${pendingMsgs.length} messages as poked.`);
                 }
 
                 resolve(res);
@@ -121,14 +128,24 @@ async function tryPoke(isRetry = false) {
 
     if (res.ok) {
         log('POKE', 'Success', { method: res.method });
+        // Update agent status to show we are processing
+        STATE.agent.state = 'working';
+        STATE.agent.lastSeen = new Date().toISOString();
+        saveState();
+        broadcast('agent_status', STATE.agent);
         stopRetry();
     } else if (res.reason && res.reason.includes('busy')) {
         // Agent is busy
         if (!isRetry) log('POKE', 'Agent busy. Scheduling retries.');
+
+        // Notify client
+        STATE.agent.state = 'busy';
+        STATE.agent.lastSeen = new Date().toISOString();
+        broadcast('agent_status', STATE.agent);
+
         startRetry();
     } else {
         log('POKE', 'Failed/Error', res);
-        // Stop retrying on hard errors (like no CDP connection)
         stopRetry();
     }
 }
@@ -491,16 +508,19 @@ app.post('/debug/create-approval', requireAuth, (req, res) => {
 // POST /messages/send
 app.post('/messages/send', checkAuth, (req, res) => {
     console.log('[DEBUG] HEX DUMP /messages/send body:', JSON.stringify(req.body));
-    const { to, channel, text, from } = req.body;
+    const { to, channel, text } = req.body;
+    let { from } = req.body;
+    from = from || 'user'; // Default to user if missing
+
     if (!to || !text) return res.status(400).json({ ok: false, error: 'missing_fields' });
 
     const msg = {
         id: 'msg_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
         createdAt: new Date().toISOString(),
-        from: from || 'user', // 'user' (phone) or 'agent'
+        from,
         to, // 'agent' or 'user'
         channel: channel || 'general',
-        text,
+        text: (from === 'user' ? '[Mobile] ' : '') + text,
         status: 'new'
     };
 
