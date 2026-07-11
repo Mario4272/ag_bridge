@@ -18,11 +18,11 @@
     "@modelcontextprotocol/sdk": "^1.26.0",
     "express": "^5.2.1",
     "qrcode-terminal": "^0.12.0",
-    "ws": "^8.19.0",
+    "ws": "^8.21.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "supertest": "^7.2.2",
-    "vitest": "^4.0.17"
+    "vitest": "^4.1.0"
   }
 }
